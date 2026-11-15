@@ -1,9 +1,11 @@
+import { isWindowsRollback } from '../../shared/rollback-policy'
 import { applyCacheResetPolicy } from './cache-reset-policy'
 import { chmod, rm, rmdir, stat, lstat, readdir, open, realpath } from 'fs/promises'
 import { createReceipt } from './cleanup-receipts'
 import { constants, existsSync } from 'fs'
 import type { Dirent, Stats } from 'fs'
 import { dirname, join, resolve, sep } from 'path'
+import { isDeletionRoot } from './deletion-path-policy'
 import { randomUUID, randomBytes } from 'crypto'
 import type {
   ScanItem,
@@ -390,6 +392,9 @@ async function secureOverwrite(filePath: string): Promise<void> {
 }
 
 export async function safeDelete(filePath: string): Promise<DeleteResult> {
+  if (isDeletionRoot(filePath)) {
+    return { path: filePath, success: false, reason: 'protected-path' }
+  }
   const settings = getSettings()
   if (settings.cleaner.secureDelete) {
     try {
@@ -542,10 +547,10 @@ async function cleanItemsNow(
   }
 
   const processItem = async (item: ScanItem): Promise<void> => {
-    if (item.cacheReset && origin === 'cloud') {
+    if ((item.cacheReset || isWindowsRollback(item)) && origin === 'cloud') {
       receipt.add(item, 'skipped', 'local-selection-required')
       filesSkipped++
-      errors.push({ path: item.path, reason: 'Performance cache resets require local selection.' })
+      errors.push({ path: item.path, reason: 'This cleanup requires local selection.' })
       onProgress?.(filesDeleted + filesSkipped, validIds.length, item.path, totalCleaned)
       return
     }

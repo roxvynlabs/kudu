@@ -1,3 +1,4 @@
+import { isWindowsRollback } from '@shared/rollback-policy'
 import { useCleanAppPrompt } from '@/hooks/useCleanAppPrompt'
 import { AI_TOOLS_VIEW, AI_TOOLS_GROUP } from '@shared/app-space-handoff'
 import { useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react'
@@ -686,7 +687,7 @@ export function CleanerPage() {
   const viewKey = JSON.stringify([activeCategory, searchScope, searchQuery, selectedOnly])
   // Privacy traces remain a deliberate group-by-group opt-in.
   const bulkSelectableIds = visibleResults
-    .filter((result) => result.category !== CleanerType.PrivacyTraces)
+    .filter((result) => result.category !== CleanerType.PrivacyTraces && !isWindowsRollback(result))
     .flatMap((result) => result.items.map((item) => item.id))
   const highlight = (text: string) =>
     splitSearchHighlight(text, searchQuery).map((part, index) =>
@@ -1059,7 +1060,12 @@ export function CleanerPage() {
               className="mb-4 space-y-3 rounded-xl border p-3 disabled:opacity-50"
               style={{ borderColor: 'var(--border-default)', background: 'var(--card-bg)' }}
             >
-              <legend className="sr-only">{t('searchResults')}</legend>
+              <legend
+                className="px-1 text-[12px] font-semibold"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                {t('searchResults')}
+              </legend>
               <div className="flex flex-wrap items-center gap-2">
                 <div
                   className="relative flex min-w-48 flex-1 items-center gap-2 rounded-lg border px-3 py-2"
@@ -1085,20 +1091,40 @@ export function CleanerPage() {
                     </button>
                   )}
                 </div>
-                <select
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+                <div
+                  role="radiogroup"
                   aria-label={t('searchScope')}
-                  value={searchScope}
-                  onChange={(event) => setSearchScope(event.target.value as 'category' | 'all')}
-                  className="rounded-lg border px-3 py-2 text-[12px]"
-                  style={{
-                    borderColor: 'var(--border-medium)',
-                    background: 'var(--card-bg)',
-                    color: 'var(--text-secondary)'
-                  }}
+                  className="flex flex-wrap items-center gap-2 text-[12px]"
                 >
-                  <option value="category">{t('currentCategory')}</option>
-                  <option value="all">{t('allCleanupCategories')}</option>
-                </select>
+                  <span aria-hidden="true" style={{ color: 'var(--text-muted)' }}>
+                    {t('searchScope')}
+                  </span>
+                  {(['category', 'all'] as const).map((scope) => (
+                    <label
+                      key={scope}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-amber-500"
+                      style={{
+                        borderColor:
+                          searchScope === scope ? 'var(--accent)' : 'var(--border-medium)',
+                        background:
+                          searchScope === scope ? 'var(--accent-muted-bg)' : 'var(--card-bg)',
+                        color: 'var(--text-secondary)'
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="cleaner-search-scope"
+                        value={scope}
+                        checked={searchScope === scope}
+                        onChange={() => setSearchScope(scope)}
+                        className="accent-amber-500"
+                      />
+                      {t(scope === 'category' ? 'currentCategory' : 'allCleanupCategories')}
+                    </label>
+                  ))}
+                </div>
                 <label
                   className="flex items-center gap-2 text-[12px]"
                   style={{ color: 'var(--text-secondary)' }}
